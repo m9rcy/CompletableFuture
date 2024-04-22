@@ -35,7 +35,7 @@ public class NewTest {
 
         System.out.println("Waiting completables");
 
-        List<String> r = getAllCompleted(completables, 3, TimeUnit.SECONDS);
+        List<String> r = getAllCompleted2(completables, 3, TimeUnit.SECONDS);
         //allOfUnlessFailed(comp1, comp3, comp2).join();
         Instant end = Instant.now();
         System.out.println(" Took: " + Duration.between(start, end).toMillis());
@@ -83,5 +83,22 @@ public class NewTest {
             return CompletableFuture.completedFuture(null);
         return CompletableFuture.anyOf(rest)
                 .thenCompose(__ -> allOfUnlessFailed(rest));
+    }
+
+    public <T> List<T> getAllCompleted2(List<CompletableFuture<T>> futuresList, long timeout, TimeUnit unit) {
+        CompletableFuture<Void> allFuturesResult = allOf(futuresList.toArray(new CompletableFuture[futuresList.size()]));
+            allFuturesResult
+            .completeOnTimeout(null, timeout, unit)
+            .thenApply(u -> {
+                if (u == null) {
+                    return CompletableFuture.failedFuture(new TimeoutException("Sorry"));
+                } else {
+                    return u;
+                }
+            });
+        return futuresList.stream()
+                .filter(future -> future.isDone() && !future.isCompletedExceptionally())
+                .map(CompletableFuture::join)
+                .collect(Collectors.<T>toList());
     }
 }
